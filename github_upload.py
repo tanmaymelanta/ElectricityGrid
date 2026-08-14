@@ -41,7 +41,7 @@ def github_request_files(FOLDER):
     return processed_files
 
 def github_upload_parquet(df, folder, report_date):
-    TOKEN = "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"
+    TOKEN = ""
     OWNER = "tanmaymelanta"
     REPO = "ElectricityGenerator"
     BRANCH = "main"
