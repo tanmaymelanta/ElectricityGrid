@@ -1,0 +1,38 @@
+name: Sync Parquet Files to Kaggle
+
+on:
+  workflow_dispatch:
+
+jobs:
+  upload-to-kaggle:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Kaggle CLI
+        run: |
+          pip install kaggle
+
+      - name: Configure Kaggle
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+        run: |
+          mkdir -p ~/.config/kaggle
+
+          cat > ~/.config/kaggle/kaggle.json <<EOF
+          {
+            "username": "$KAGGLE_USERNAME",
+            "key": "$KAGGLE_KEY"
+          }
+          EOF
+
+          chmod 600 ~/.config/kaggle/kaggle.json
+
+      - name: Check Kaggle authentication
+        run: |
+          kaggle datasets list --search electricity
