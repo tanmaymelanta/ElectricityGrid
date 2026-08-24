@@ -1,21 +1,21 @@
 name: Power Supply ETL
 
 on:
-  # Run automatically whenever a parquet file is added/changed
   push:
     branches:
       - main
     paths:
       - "Power Supply Statewise/**/*.parquet"
-  # Allow manual execution from GitHub
   workflow_dispatch:
-
+  
 jobs:
   power-supply-etl:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -24,8 +24,34 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+      - name: Detect changed parquet files
+        id: changed_files
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual run detected."
+            echo "Processing all parquet files."
+            find "Power Supply Statewise" \
+              -type f \
+              -name "*.parquet" \
+              > changed_files.txt
+          else
+            echo "Push detected."
+            echo "Finding added/modified parquet files."
+            git diff \
+              --name-only \
+              --diff-filter=AM \
+              "${{ github.event.before }}" \
+              "${{ github.sha }}" \
+              -- "Power Supply Statewise/**/*.parquet" \
+              > changed_files.txt
+          fi
+          echo ""
+          echo "Files to process:"
+          cat changed_files.txt
       - name: Run Power Supply ETL
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          CHANGED_FILES: ${{ steps.changed_files.outputs.files }}
         run: |
+          export CHANGED_FILES="$(cat changed_files.txt)"
           python "Data Pipeline Codes/power_supply_etl.py"
