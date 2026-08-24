@@ -28,4 +28,4 @@ jobs:
         # env:
         #   DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          python Data Pipeline Codes/power_supply_etl.py
+          python "Data Pipeline Codes/power_supply_etl.py"
