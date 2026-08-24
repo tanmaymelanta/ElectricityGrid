@@ -145,3 +145,7 @@ def power_supply_etl():
     }
     for source_column in numeric_mapping:
         grouped_df[source_column] = pd.to_numeric(grouped_df[source_column], errors="coerce")
+    print(len(grouped_df))
+    
+if __name__ == "__main__":
+    power_supply_etl()
