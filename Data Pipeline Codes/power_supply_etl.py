@@ -2,7 +2,7 @@ import pandas as pd
 import glob
 import os
 import re
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 
 # ============================================================
 # CONFIGURATION
@@ -65,11 +65,16 @@ def power_supply_etl():
         (r"^filename$", "filename"),
         (r"^report_date$", "report_date"),
     ]
-    parquet_files = glob.glob(os.path.join(FOLDER_PATH, "*.parquet"))
-
+    changed_files = os.environ.get("CHANGED_FILES", "").strip()
+    if changed_files:
+        parquet_files = [f.strip() for f in changed_files.splitlines() if f.strip().endswith(".parquet")]
+        parquet_files = [f for f in parquet_files if os.path.isfile(f)]
+    else:
+        parquet_files = glob.glob(os.path.join(FOLDER_PATH, "*.parquet"))
+    print(f"Files to process: {len(parquet_files)}")
     if not parquet_files:
-        raise FileNotFoundError(f"No parquet files found in: {FOLDER_PATH}")
-
+        print("No parquet files require processing.")
+        return
     # ============================== MERGE ALL PARQUETS ==============================
     dfs = []
     for f in parquet_files:
@@ -137,7 +142,7 @@ def power_supply_etl():
     if grouped_df["report_date"].isna().any():
         bad_dates = grouped_df[grouped_df["report_date"].isna()]
         raise ValueError("Invalid report_date values found:\n"f"{bad_dates.head(20)}")
-    # ============================== DATA CLEANUP ==============================
+    # ============================== NUMERIC DATA CLEANUP ==============================
     numeric_mapping = {
         "Energy Met (MU)": "energy_met_mu",
         "Max Demand Met During the Day (MW)": "max_demand_met_mw",
@@ -186,14 +191,60 @@ def power_supply_etl():
     )
     fact_df = fact_df.where(pd.notnull(fact_df),None)
     # ============================== LOAD FACT TO DATABASE ==============================
-    fact_df.to_sql(
-        "fact_statepowersupply",
-        engine,
-        schema="warehouse",
-        if_exists="append",
-        index=False,
-        method="multi"
-    )
-    
+    staging_table = "stg_fact_statepowersupply"
+    with engine.begin() as connection:
+        connection.execute(text(f"DROP TABLE IF EXISTS warehouse.{staging_table}"))
+        connection.execute(text(f"""
+            CREATE TABLE warehouse.{staging_table} AS 
+            SELECT * FROM warehouse.fact_statepowersupply WITH NO DATA
+            """
+        ))
+        fact_df.to_sql(
+            staging_table,
+            connection,
+            schema="warehouse",
+            if_exists="append",
+            index=False,
+            method="multi",
+            chunksize=1000
+        )
+        connection.execute(text(f"""
+            DELETE FROM warehouse.fact_statepowersupply f
+                USING (
+                    SELECT DISTINCT source_filename
+                    FROM warehouse.{staging_table}
+                ) s
+                WHERE f.source_filename = s.source_filename
+            """
+        ))
+        connection.execute(text(f"""
+            INSERT INTO warehouse.fact_statepowersupply (
+                date_key,
+                region_key,
+                state_key,
+                entity_type,
+                energy_met_mu,
+                max_demand_met_mw,
+                drawal_schedule_mu,
+                energy_shortage_mu,
+                od_ud_mu,
+                source_filename
+            )
+            SELECT
+                date_key,
+                region_key,
+                state_key,
+                entity_type,
+                energy_met_mu,
+                max_demand_met_mw,
+                drawal_schedule_mu,
+                energy_shortage_mu,
+                od_ud_mu,
+                source_filename
+            FROM warehouse.{staging_table}
+            """
+        ))
+        connection.execute(text(f"DROP TABLE warehouse.{staging_table}"))   
+        print("DATABASE LOAD SUCCESSFUL")
 if __name__ == "__main__":
     power_supply_etl()
