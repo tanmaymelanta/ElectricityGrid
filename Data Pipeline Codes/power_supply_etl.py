@@ -8,6 +8,8 @@ from sqlalchemy import create_engine
 # CONFIGURATION
 # ============================================================
 FOLDER_PATH = "Power Supply Statewise"
+DATABASE_URL = os.environ["DATABASE_URL"]
+engine = create_engine(DATABASE_URL)
 
 # ============================================================
 # HELPER FUNCTIONS
@@ -145,7 +147,53 @@ def power_supply_etl():
     }
     for source_column in numeric_mapping:
         grouped_df[source_column] = pd.to_numeric(grouped_df[source_column], errors="coerce")
-    print(len(grouped_df))
+    # ============================== LOAD DIMENSION LOOKUPS ==============================
+    date_lookup = pd.read_sql("SELECT date_key, full_date FROM warehouse.dim_date", engine)
+    date_lookup["full_date"] = pd.to_datetime(date_lookup["full_date"]).dt.date
+    region_lookup = pd.read_sql("SELECT region_key, UPPER(TRIM(region_name)) AS region_name FROM warehouse.dim_region",engine)
+    state_lookup = pd.read_sql("SELECT state_key, TRIM(state_name) AS state_name FROM warehouse.dim_state", engine)
+    grouped_df = grouped_df.merge(date_lookup, left_on="report_date", right_on="full_date", how="left")
+    grouped_df["Region"] = grouped_df["Region"].astype(str).str.strip().str.upper()
+    grouped_df = grouped_df.merge(region_lookup, left_on="Region", right_on="region_name", how="left")
+    grouped_df["State"] = grouped_df["State"].astype(str).str.strip()
+    grouped_df = grouped_df.merge(state_lookup, left_on="State", right_on="state_name", how="left")
+    # ============================== DIMENSION TABLE VALIDATION ==============================
+    missing_dates = grouped_df[grouped_df["date_key"].isna()]
+    if not missing_dates.empty:
+        raise ValueError(f"Some report dates do not exist in dim_date:\n{missing_dates[['report_date']].drop_duplicates()}")
+    missing_regions = grouped_df[grouped_df["region_key"].isna()]
+    if not missing_regions.empty:
+        raise ValueError(f"Some regions do not exist in dim_region:\n{missing_regions[['Region']].drop_duplicates()}")
+    missing_states = grouped_df[(grouped_df["entity_type"] == "STATE") & (grouped_df["state_key"].isna())]
+    if not missing_states.empty:
+        raise ValueError(f"Some STATE values do not exist in dim_state:\n{missing_states[['State']].drop_duplicates()}")
+    # ============================== GRAIN VALIDATION ==============================
+    duplicate_grain = grouped_df.groupby(["date_key","region_key","state_key","entity_type"], dropna=False).size().reset_index(name="row_count")
+    duplicates = duplicate_grain[duplicate_grain["row_count"] > 1]
+    if not duplicates.empty:
+        raise ValueError(f"Duplicate fact grain detected:\n{duplicates}")
+    # ============================== FACT TABLE ==============================
+    fact_df = grouped_df[["date_key","region_key","state_key","entity_type","Energy Met (MU)","Max Demand Met During the Day (MW)","Drawal Schedule (MU)","Energy Shortage (MU)","OD(+)/UD(-) (MU)","filename"]].copy()
+    fact_df = fact_df.rename(
+        columns={
+            "Energy Met (MU)": "energy_met_mu",
+            "Max Demand Met During the Day (MW)": "max_demand_met_mw",
+            "Drawal Schedule (MU)": "drawal_schedule_mu",
+            "Energy Shortage (MU)": "energy_shortage_mu",
+            "OD(+)/UD(-) (MU)": "od_ud_mu",
+            "filename": "source_filename"
+        }
+    )
+    # ============================== LOAD FACT TO DATABASE ==============================
+    fact_df = fact_df.where(pd.notnull(fact_df),None)
+        fact_df.to_sql(
+        "fact_statepowersupply",
+        engine,
+        schema="warehouse",
+        if_exists="append",
+        index=False,
+        method="multi"
+    )
     
 if __name__ == "__main__":
     power_supply_etl()
