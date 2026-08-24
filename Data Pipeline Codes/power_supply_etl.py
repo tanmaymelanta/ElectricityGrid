@@ -184,9 +184,9 @@ def power_supply_etl():
             "filename": "source_filename"
         }
     )
-    # ============================== LOAD FACT TO DATABASE ==============================
     fact_df = fact_df.where(pd.notnull(fact_df),None)
-        fact_df.to_sql(
+    # ============================== LOAD FACT TO DATABASE ==============================
+    fact_df.to_sql(
         "fact_statepowersupply",
         engine,
         schema="warehouse",
