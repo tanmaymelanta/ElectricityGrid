@@ -51,7 +51,5 @@ jobs:
       - name: Run Power Supply ETL
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          CHANGED_FILES: ${{ steps.changed_files.outputs.files }}
         run: |
-          export CHANGED_FILES="$(cat changed_files.txt)"
           python "Data Pipeline Codes/power_supply_etl.py"
