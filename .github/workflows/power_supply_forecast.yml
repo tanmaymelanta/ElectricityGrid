@@ -1,0 +1,32 @@
+name: Power Demand Forecast
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows:
+      - "Power Supply ETL"
+    types:
+      - completed
+
+jobs:
+  forecast:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pandas sqlalchemy psycopg2-binary prophet
+      - name: Run demand forecast
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          python "Data Pipeline Codes/power_demand_forecast.py"
