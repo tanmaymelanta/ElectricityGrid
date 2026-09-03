@@ -79,7 +79,6 @@ def source_generation_etl():
         dfs.append(df)
 
     combined_df = pd.concat(dfs,ignore_index=True)
-    print(f"Total source rows: {len(combined_df)}")
 
     required_columns = ["Time","Region","filename"]
     measure_columns = ["Nuclear","Wind","Solar","Hydro","Gas","Thermal"]
@@ -89,177 +88,42 @@ def source_generation_etl():
 
     for col in measure_columns:
         if col not in combined_df.columns:
-            print(f"WARNING: {col} not found. Creating NULL column.")
             combined_df[col] = None
 
     columns_to_keep = (required_columns + measure_columns)
     final_df = combined_df[columns_to_keep].copy()
     final_df["Region"] = (final_df["Region"].astype(str).str.strip().str.upper())
     final_df["Time"] = pd.to_datetime(final_df["Time"],errors="coerce")
+    
     invalid_times = final_df[final_df["Time"].isna()]
-
     if not invalid_times.empty:
         raise ValueError(f"Invalid Time values found:\n {invalid_times.head(20)}")
 
-    numeric_mapping = {
-        "Nuclear": "nuclear",
-        "Wind": "wind",
-        "Solar": "solar",
-        "Hydro": "hydro",
-        "Gas": "gas",
-        "Thermal": "thermal"
-    }
+    numeric_mapping = {"Nuclear":"nuclear","Wind":"wind","Solar":"solar","Hydro":"hydro","Gas":"gas","Thermal":"thermal"}
     for source_column in numeric_mapping:
         final_df[source_column] = pd.to_numeric(final_df[source_column],errors="coerce")
+    
     duplicate_grain = (final_df.groupby(["Time","Region"],dropna=False).size().reset_index(name="row_count"))
     duplicates = duplicate_grain[duplicate_grain["row_count"] > 1]
-
-
     if not duplicates.empty:
+        raise ValueError(f"Duplicate source generation grain detected before dimension lookup:\n{duplicates}")
 
-        raise ValueError(
-            "Duplicate source generation grain "
-            "detected before dimension lookup:\n"
-            f"{duplicates}"
-        )
-
-
-    # ========================================================
-    # LOAD REGION DIMENSION
-    # ========================================================
-
-    region_lookup = pd.read_sql(
-        """
-        SELECT
-            region_key,
-            UPPER(TRIM(region_name)) AS region_name
-        FROM warehouse.dim_region
-        """,
-        engine
-    )
-
-
-    # ========================================================
-    # REGION LOOKUP
-    # ========================================================
-
-    final_df = final_df.merge(
-        region_lookup,
-        left_on="Region",
-        right_on="region_name",
-        how="left"
-    )
-
-
-    # ========================================================
-    # REGION VALIDATION
-    # ========================================================
-
-    missing_regions = final_df[
-        final_df["region_key"].isna()
-    ]
-
-
+    region_lookup = pd.read_sql("""SELECT region_key, UPPER(TRIM(region_name)) AS region_name FROM warehouse.dim_region""",engine)
+    final_df = final_df.merge(region_lookup,left_on="Region",right_on="region_name",how="left")
+    missing_regions = final_df[final_df["region_key"].isna()]
     if not missing_regions.empty:
+        raise ValueError(f"Some regions do not exist in warehouse.dim_region:\n{missing_regions[['Region']].drop_duplicates()}")
 
-        raise ValueError(
-            "Some regions do not exist "
-            "in warehouse.dim_region:\n"
-            f"{missing_regions[['Region']].drop_duplicates()}"
-        )
-
-
-    # ========================================================
-    # FACT TABLE
-    # ========================================================
-
-    fact_df = final_df[
-        [
-            "Time",
-            "region_key",
-            "Nuclear",
-            "Wind",
-            "Solar",
-            "Hydro",
-            "Gas",
-            "Thermal",
-            "filename"
-        ]
-    ].copy()
-
-
-    # ========================================================
-    # RENAME TO WAREHOUSE COLUMN NAMES
-    # ========================================================
-
-    fact_df = fact_df.rename(
-        columns={
-
-            "Time": "generation_time",
-
-            "Nuclear": "nuclear",
-
-            "Wind": "wind",
-
-            "Solar": "solar",
-
-            "Hydro": "hydro",
-
-            "Gas": "gas",
-
-            "Thermal": "thermal",
-
-            "filename": "source_filename"
-
-        }
-    )
-
-
-    # ========================================================
-    # NULL CLEANUP
-    # ========================================================
-
-    fact_df = fact_df.where(
-        pd.notnull(fact_df),
-        None
-    )
-
-
-    # ========================================================
-    # LOAD FACT TO DATABASE
-    # ========================================================
-
-    staging_table = (
-        "stg_fact_source_generation"
-    )
-
+    fact_df = final_df[["Time","region_key","Nuclear","Wind","Solar","Hydro","Gas","Thermal","filename"]].copy()
+    fact_df = fact_df.rename(columns={"Time": "generation_time", "Nuclear": "nuclear", "Wind": "wind", "Solar": "solar", "Hydro": "hydro", "Gas": "gas", "Thermal": "thermal", "filename": "source_filename"})
+    fact_df = fact_df.where(pd.notnull(fact_df),None)
+    staging_table = ("stg_fact_source_generation")
 
     with engine.begin() as connection:
-
-        # ----------------------------------------------------
-        # Drop previous staging table
-        # ----------------------------------------------------
-
+        connection.execute(text(f"""DROP TABLE IF EXISTS warehouse.{staging_table}"""))
         connection.execute(
-            text(
-                f"""
-                DROP TABLE IF EXISTS
-                warehouse.{staging_table}
-                """
-            )
-        )
-
-
-        # ----------------------------------------------------
-        # Create staging table using fact structure
-        # ----------------------------------------------------
-
-        connection.execute(
-            text(
-                f"""
-                CREATE TABLE warehouse.{staging_table}
-                AS
-                SELECT *
+            text(f"""CREATE TABLE warehouse.{staging_table} AS
+SELECT *
                 FROM warehouse.fact_source_generation
                 WITH NO DATA
                 """
