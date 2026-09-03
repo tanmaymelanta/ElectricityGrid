@@ -122,123 +122,68 @@ def source_generation_etl():
     with engine.begin() as connection:
         connection.execute(text(f"""DROP TABLE IF EXISTS warehouse.{staging_table}"""))
         connection.execute(
-            text(f"""CREATE TABLE warehouse.{staging_table} AS
-SELECT *
+            text(
+                f"""
+                CREATE TABLE warehouse.{staging_table} AS
+                SELECT *
                 FROM warehouse.fact_source_generation
                 WITH NO DATA
                 """
             )
         )
-
-
-        # ----------------------------------------------------
-        # Load transformed data into staging
-        # ----------------------------------------------------
-
-        fact_df.to_sql(
-            staging_table,
-            connection,
-            schema="warehouse",
-            if_exists="append",
-            index=False,
-            method="multi",
-            chunksize=1000
-        )
-
-
-        # ----------------------------------------------------
-        # Delete existing records belonging to the
-        # files being reprocessed
-        # ----------------------------------------------------
-
+        fact_df.to_sql(staging_table,connection,schema="warehouse",if_exists="append",index=False,method="multi",chunksize=1000)
         connection.execute(
             text(
                 f"""
                 DELETE FROM
                     warehouse.fact_source_generation f
-
                 USING (
                     SELECT DISTINCT
                         source_filename
                     FROM
                         warehouse.{staging_table}
                 ) s
-
                 WHERE
                     f.source_filename =
                     s.source_filename
                 """
             )
         )
-
-
-        # ----------------------------------------------------
-        # Insert refreshed data
-        # ----------------------------------------------------
-
         connection.execute(
             text(
                 f"""
                 INSERT INTO
                     warehouse.fact_source_generation (
-
                         generation_time,
                         region_key,
-
                         nuclear,
                         wind,
                         solar,
                         hydro,
                         gas,
                         thermal,
-
                         source_filename
-
                     )
-
                 SELECT
-
                     generation_time,
                     region_key,
-
                     nuclear,
                     wind,
                     solar,
                     hydro,
                     gas,
                     thermal,
-
                     source_filename
-
                 FROM
                     warehouse.{staging_table}
                 """
             )
         )
-
-
-        # ----------------------------------------------------
-        # Drop staging table
-        # ----------------------------------------------------
-
-        connection.execute(
-            text(
-                f"""
-                DROP TABLE
-                    warehouse.{staging_table}
-                """
-            )
-        )
-
-
-        print(
-            "DATABASE LOAD SUCCESSFUL"
-        )
-
+        connection.execute(text(f"""DROP TABLE warehouse.{staging_table}"""))
+        print("DATABASE LOAD SUCCESSFUL")
 
 # ============================================================
 # RUN
 # ============================================================
-
 if __name__ == "__main__":
     source_generation_etl()
