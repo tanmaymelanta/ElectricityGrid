@@ -1,0 +1,56 @@
+name: Source Generation ETL
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "Source Generation Regionwise/**/*.parquet"
+  workflow_dispatch:
+
+jobs:
+  source-generation-etl:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Detect changed parquet files
+        id: changed_files
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual run detected."
+            echo "Processing all parquet files."
+            find "Source Generation Regionwise" \
+              -type f \
+              -name "*.parquet" \
+              > changed_files.txt
+          else
+            echo "Push detected."
+            echo "Finding added/modified parquet files."
+            git diff \
+              --name-only \
+              --diff-filter=AM \
+              "${{ github.event.before }}" \
+              "${{ github.sha }}" \
+              -- "Source Generation/**/*.parquet" \
+              > changed_files.txt
+          fi
+          echo ""
+          echo "Files to process:"
+          cat changed_files.txt
+      - name: Run Source Generation ETL
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          CHANGED_FILES: ${{ steps.changed_files.outputs.files }}
+        run: |
+          python "Data Pipeline Codes/source_generation_etl.py"
