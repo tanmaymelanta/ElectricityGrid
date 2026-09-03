@@ -4,332 +4,220 @@ import os
 import re
 from sqlalchemy import create_engine, text
 
-
 # ============================================================
-# CONFIG
+# CONFIGURATION
 # ============================================================
-
-FOLDER_PATH = "Source Generation Regionwise"
+FOLDER_PATH = "Source Generation"
 DATABASE_URL = os.environ["DATABASE_URL"]
 engine = create_engine(DATABASE_URL)
 
 # ============================================================
-# SOURCE GENERATION ETL
+# HELPER FUNCTIONS
 # ============================================================
+def clean_col(col):
+    col = str(col).replace("\n", " ")
+    col = re.sub(r"\s+", " ", col).strip()
+    col = re.sub(r"[¹²³*]", "", col)
+    return col.strip()
 
+def map_to_canonical(col, CANONICAL_MAP):
+    c = col.lower()
+    for pattern, canonical in CANONICAL_MAP:
+        if re.search(pattern, c):
+            return canonical
+    return col
+
+def coalesce_duplicate_columns(df):
+    if not df.columns.duplicated().any():
+        return df
+    new_df = pd.DataFrame(index=df.index)
+    for col in df.columns.unique():
+        subset = df.loc[:, df.columns == col]
+        if subset.shape[1] > 1:
+            new_df[col] = subset.bfill(axis=1).iloc[:, 0]
+        else:
+            new_df[col] = subset.iloc[:, 0]
+    return new_df
+
+# ============================================================
+# MAIN ETL
+# ============================================================
 def source_generation_etl():
+    CANONICAL_MAP = [
+        (r"^time$", "Time"),
+        (r"^region$", "Region"),
+        (r"^nuclear$", "Nuclear"),
+        (r"^wind$", "Wind"),
+        (r"^solar$", "Solar"),
+        (r"^hydro$", "Hydro"),
+        (r"^gas$", "Gas"),
+        (r"^thermal$", "Thermal"),
+        (r"^filename$", "filename"),
+    ]
 
-    # --------------------------------------------------------
-    # 1. Find parquet files
-    # --------------------------------------------------------
-
-    parquet_files = glob.glob(
-        os.path.join(FOLDER_PATH, "*.parquet")
-    )
-
+    changed_files = os.environ.get("CHANGED_FILES", "").strip()
+    if changed_files:
+        parquet_files = [f.strip() for f in changed_files.splitlines() if f.strip().endswith(".parquet")]
+        parquet_files = [f for f in parquet_files if os.path.isfile(f)]
+    else:
+        parquet_files = glob.glob(os.path.join(FOLDER_PATH,"*.parquet"))
+    print(f"Files to process: {len(parquet_files)}")
     if not parquet_files:
-        print("No parquet files found.")
+        print("No parquet files require processing.")
         return
-
-    print(f"Found {len(parquet_files)} parquet files")
-
-
-    # --------------------------------------------------------
-    # 2. Read all parquet files
-    # --------------------------------------------------------
-
+        
     dfs = []
+    for f in parquet_files:
+        print(f"Reading: {os.path.basename(f)}")
+        df = pd.read_parquet(f)
+        df.columns = [clean_col(c) for c in df.columns]
 
-    for file in parquet_files:
-
-        print(f"Reading: {file}")
-
-        df = pd.read_parquet(file)
-
-        # ----------------------------------------------------
-        # Standardize column names
-        # ----------------------------------------------------
-
-        df.columns = [
-            str(col).strip().replace("\n", " ")
-            for col in df.columns
-        ]
-
-        # ----------------------------------------------------
-        # Rename columns to warehouse naming convention
-        # ----------------------------------------------------
-
-        rename_map = {
-            "Time": "generation_time",
-            "Region": "Region",
-            "Nuclear": "nuclear",
-            "Wind": "wind",
-            "Solar": "solar",
-            "Hydro": "hydro",
-            "Gas": "gas",
-            "Thermal": "thermal",
-            "filename": "source_filename"
-        }
-
-        df = df.rename(columns=rename_map)
-
-        # ----------------------------------------------------
-        # Add filename if source file doesn't contain it
-        # ----------------------------------------------------
-
-        if "source_filename" not in df.columns:
-            df["source_filename"] = os.path.basename(file)
-
+        df.columns = [map_to_canonical(c,CANONICAL_MAP) for c in df.columns]
+        df = coalesce_duplicate_columns(df)
+        if "filename" not in df.columns:
+            df["filename"] = os.path.basename(f)
         dfs.append(df)
 
-
-    # --------------------------------------------------------
-    # 3. Combine files
-    # --------------------------------------------------------
-
-    combined_df = pd.concat(
-        dfs,
-        ignore_index=True
-    )
-
+    combined_df = pd.concat(dfs,ignore_index=True)
     print(f"Total source rows: {len(combined_df)}")
 
+    required_columns = ["Time","Region","filename"]
+    measure_columns = ["Nuclear","Wind","Solar","Hydro","Gas","Thermal"]
+    missing_required_columns = [col for col in required_columns if col not in combined_df.columns]
+    if missing_required_columns:
+        raise ValueError(f"Missing mandatory columns: {missing_required_columns}")
 
-    # --------------------------------------------------------
-    # 4. Validate required columns
-    # --------------------------------------------------------
-
-    required_columns = [
-        "generation_time",
-        "Region",
-        "source_filename"
-    ]
-
-    missing_columns = [
-        col
-        for col in required_columns
-        if col not in combined_df.columns
-    ]
-
-    if missing_columns:
-
-        raise ValueError(
-            f"Missing required columns: {missing_columns}"
-        )
-
-
-    # --------------------------------------------------------
-    # 5. Make sure generation columns exist
-    # --------------------------------------------------------
-
-    generation_columns = [
-        "nuclear",
-        "wind",
-        "solar",
-        "hydro",
-        "gas",
-        "thermal"
-    ]
-
-    for col in generation_columns:
-
+    for col in measure_columns:
         if col not in combined_df.columns:
-
-            print(
-                f"WARNING: {col} not present. "
-                f"Creating NULL column."
-            )
-
+            print(f"WARNING: {col} not found. Creating NULL column.")
             combined_df[col] = None
 
+    columns_to_keep = (required_columns + measure_columns)
+    final_df = combined_df[columns_to_keep].copy()
+    final_df["Region"] = (final_df["Region"].astype(str).str.strip().str.upper())
+    final_df["Time"] = pd.to_datetime(final_df["Time"],errors="coerce")
+    invalid_times = final_df[final_df["Time"].isna()]
 
-    # --------------------------------------------------------
-    # 6. Clean Region
-    # --------------------------------------------------------
+    if not invalid_times.empty:
+        raise ValueError(f"Invalid Time values found:\n {invalid_times.head(20)}")
 
-    combined_df["Region"] = (
-        combined_df["Region"]
-        .astype(str)
-        .str.strip()
-        .str.upper()
-    )
+    numeric_mapping = {
+        "Nuclear": "nuclear",
+        "Wind": "wind",
+        "Solar": "solar",
+        "Hydro": "hydro",
+        "Gas": "gas",
+        "Thermal": "thermal"
+    }
+    for source_column in numeric_mapping:
+        final_df[source_column] = pd.to_numeric(final_df[source_column],errors="coerce")
+    duplicate_grain = (final_df.groupby(["Time","Region"],dropna=False).size().reset_index(name="row_count"))
+    duplicates = duplicate_grain[duplicate_grain["row_count"] > 1]
 
-
-    # --------------------------------------------------------
-    # 7. Convert Time to datetime
-    # --------------------------------------------------------
-
-    combined_df["generation_time"] = pd.to_datetime(
-        combined_df["generation_time"],
-        errors="coerce"
-    )
-
-    invalid_time = combined_df["generation_time"].isna().sum()
-
-    if invalid_time > 0:
-
-        raise ValueError(
-            f"Found {invalid_time} rows with invalid generation_time"
-        )
-
-
-    # --------------------------------------------------------
-    # 8. Convert generation measures to numeric
-    # --------------------------------------------------------
-
-    for col in generation_columns:
-
-        combined_df[col] = pd.to_numeric(
-            combined_df[col],
-            errors="coerce"
-        )
-
-
-    # --------------------------------------------------------
-    # 9. Select final columns
-    # --------------------------------------------------------
-
-    final_df = combined_df[
-        [
-            "generation_time",
-            "Region",
-            "nuclear",
-            "wind",
-            "solar",
-            "hydro",
-            "gas",
-            "thermal",
-            "source_filename"
-        ]
-    ].copy()
-
-
-    # --------------------------------------------------------
-    # 10. Check duplicate grain
-    #
-    # Grain:
-    # generation_time + Region
-    # --------------------------------------------------------
-
-    duplicates = final_df[
-        final_df.duplicated(
-            subset=[
-                "generation_time",
-                "Region"
-            ],
-            keep=False
-        )
-    ]
 
     if not duplicates.empty:
 
-        print(
-            f"WARNING: Found {len(duplicates)} rows "
-            f"with duplicate generation_time + Region"
-        )
-
-        # ----------------------------------------------------
-        # If source contains duplicate rows for same
-        # generation_time + Region, aggregate them.
-        # ----------------------------------------------------
-
-        agg_dict = {
-            "nuclear": "sum",
-            "wind": "sum",
-            "solar": "sum",
-            "hydro": "sum",
-            "gas": "sum",
-            "thermal": "sum",
-            "source_filename": "first"
-        }
-
-        final_df = (
-            final_df
-            .groupby(
-                [
-                    "generation_time",
-                    "Region"
-                ],
-                as_index=False
-            )
-            .agg(agg_dict)
+        raise ValueError(
+            "Duplicate source generation grain "
+            "detected before dimension lookup:\n"
+            f"{duplicates}"
         )
 
 
-    # --------------------------------------------------------
-    # 11. Load region dimension
-    # --------------------------------------------------------
+    # ========================================================
+    # LOAD REGION DIMENSION
+    # ========================================================
 
-    region_query = text("""
+    region_lookup = pd.read_sql(
+        """
         SELECT
             region_key,
-            region_name
+            UPPER(TRIM(region_name)) AS region_name
         FROM warehouse.dim_region
-    """)
-
-    region_df = pd.read_sql(
-        region_query,
+        """,
         engine
     )
 
-    region_df["region_name"] = (
-        region_df["region_name"]
-        .astype(str)
-        .str.strip()
-        .str.upper()
-    )
 
-
-    # --------------------------------------------------------
-    # 12. Join with dim_region
-    # --------------------------------------------------------
+    # ========================================================
+    # REGION LOOKUP
+    # ========================================================
 
     final_df = final_df.merge(
-        region_df,
+        region_lookup,
         left_on="Region",
         right_on="region_name",
         how="left"
     )
 
 
-    # --------------------------------------------------------
-    # 13. Validate region lookup
-    # --------------------------------------------------------
+    # ========================================================
+    # REGION VALIDATION
+    # ========================================================
 
     missing_regions = final_df[
         final_df["region_key"].isna()
-    ]["Region"].drop_duplicates().tolist()
+    ]
 
-    if missing_regions:
+
+    if not missing_regions.empty:
 
         raise ValueError(
-            "The following regions were not found "
-            f"in warehouse.dim_region: {missing_regions}"
+            "Some regions do not exist "
+            "in warehouse.dim_region:\n"
+            f"{missing_regions[['Region']].drop_duplicates()}"
         )
 
 
-    # --------------------------------------------------------
-    # 14. Build fact dataframe
-    # --------------------------------------------------------
+    # ========================================================
+    # FACT TABLE
+    # ========================================================
 
     fact_df = final_df[
         [
-            "generation_time",
+            "Time",
             "region_key",
-            "nuclear",
-            "wind",
-            "solar",
-            "hydro",
-            "gas",
-            "thermal",
-            "source_filename"
+            "Nuclear",
+            "Wind",
+            "Solar",
+            "Hydro",
+            "Gas",
+            "Thermal",
+            "filename"
         ]
     ].copy()
 
 
-    # --------------------------------------------------------
-    # 15. Convert numpy NaN to None
-    # --------------------------------------------------------
+    # ========================================================
+    # RENAME TO WAREHOUSE COLUMN NAMES
+    # ========================================================
+
+    fact_df = fact_df.rename(
+        columns={
+
+            "Time": "generation_time",
+
+            "Nuclear": "nuclear",
+
+            "Wind": "wind",
+
+            "Solar": "solar",
+
+            "Hydro": "hydro",
+
+            "Gas": "gas",
+
+            "Thermal": "thermal",
+
+            "filename": "source_filename"
+
+        }
+    )
+
+
+    # ========================================================
+    # NULL CLEANUP
+    # ========================================================
 
     fact_df = fact_df.where(
         pd.notnull(fact_df),
@@ -337,79 +225,151 @@ def source_generation_etl():
     )
 
 
-    # --------------------------------------------------------
-    # 16. Load to staging table
-    # --------------------------------------------------------
+    # ========================================================
+    # LOAD FACT TO DATABASE
+    # ========================================================
 
-    staging_table = "staging_source_generation"
-
-    print(
-        f"Writing {len(fact_df)} rows to "
-        f"staging.{staging_table}"
+    staging_table = (
+        "stg_fact_source_generation"
     )
-
-    fact_df.to_sql(
-        staging_table,
-        engine,
-        schema="staging",
-        if_exists="replace",
-        index=False,
-        method="multi"
-    )
-
-
-    # --------------------------------------------------------
-    # 17. UPSERT into fact table
-    # --------------------------------------------------------
-
-    upsert_sql = text("""
-        INSERT INTO warehouse.fact_source_generation (
-            generation_time,
-            region_key,
-            nuclear,
-            wind,
-            solar,
-            hydro,
-            gas,
-            thermal,
-            source_filename
-        )
-        SELECT
-            generation_time,
-            region_key,
-            nuclear,
-            wind,
-            solar,
-            hydro,
-            gas,
-            thermal,
-            source_filename
-        FROM staging.staging_source_generation
-
-        ON CONFLICT (
-            generation_time,
-            region_key
-        )
-        DO UPDATE SET
-
-            nuclear = EXCLUDED.nuclear,
-            wind = EXCLUDED.wind,
-            solar = EXCLUDED.solar,
-            hydro = EXCLUDED.hydro,
-            gas = EXCLUDED.gas,
-            thermal = EXCLUDED.thermal,
-            source_filename = EXCLUDED.source_filename;
-    """)
 
 
     with engine.begin() as connection:
 
-        connection.execute(upsert_sql)
+        # ----------------------------------------------------
+        # Drop previous staging table
+        # ----------------------------------------------------
+
+        connection.execute(
+            text(
+                f"""
+                DROP TABLE IF EXISTS
+                warehouse.{staging_table}
+                """
+            )
+        )
 
 
-    print(
-        "Source generation ETL completed successfully."
-    )
+        # ----------------------------------------------------
+        # Create staging table using fact structure
+        # ----------------------------------------------------
+
+        connection.execute(
+            text(
+                f"""
+                CREATE TABLE warehouse.{staging_table}
+                AS
+                SELECT *
+                FROM warehouse.fact_source_generation
+                WITH NO DATA
+                """
+            )
+        )
+
+
+        # ----------------------------------------------------
+        # Load transformed data into staging
+        # ----------------------------------------------------
+
+        fact_df.to_sql(
+            staging_table,
+            connection,
+            schema="warehouse",
+            if_exists="append",
+            index=False,
+            method="multi",
+            chunksize=1000
+        )
+
+
+        # ----------------------------------------------------
+        # Delete existing records belonging to the
+        # files being reprocessed
+        # ----------------------------------------------------
+
+        connection.execute(
+            text(
+                f"""
+                DELETE FROM
+                    warehouse.fact_source_generation f
+
+                USING (
+                    SELECT DISTINCT
+                        source_filename
+                    FROM
+                        warehouse.{staging_table}
+                ) s
+
+                WHERE
+                    f.source_filename =
+                    s.source_filename
+                """
+            )
+        )
+
+
+        # ----------------------------------------------------
+        # Insert refreshed data
+        # ----------------------------------------------------
+
+        connection.execute(
+            text(
+                f"""
+                INSERT INTO
+                    warehouse.fact_source_generation (
+
+                        generation_time,
+                        region_key,
+
+                        nuclear,
+                        wind,
+                        solar,
+                        hydro,
+                        gas,
+                        thermal,
+
+                        source_filename
+
+                    )
+
+                SELECT
+
+                    generation_time,
+                    region_key,
+
+                    nuclear,
+                    wind,
+                    solar,
+                    hydro,
+                    gas,
+                    thermal,
+
+                    source_filename
+
+                FROM
+                    warehouse.{staging_table}
+                """
+            )
+        )
+
+
+        # ----------------------------------------------------
+        # Drop staging table
+        # ----------------------------------------------------
+
+        connection.execute(
+            text(
+                f"""
+                DROP TABLE
+                    warehouse.{staging_table}
+                """
+            )
+        )
+
+
+        print(
+            "DATABASE LOAD SUCCESSFUL"
+        )
 
 
 # ============================================================
