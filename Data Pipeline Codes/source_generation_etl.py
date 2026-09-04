@@ -106,10 +106,6 @@ def source_generation_etl():
     duplicate_grain = (final_df.groupby(["Time","Region"],dropna=False).size().reset_index(name="row_count"))
     duplicates = duplicate_grain[duplicate_grain["row_count"] > 1]
     if not duplicates.empty:
-        final_df.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=False)
-        duplicate_grain = (final_df.groupby(["Time","Region"],dropna=False).size().reset_index(name="row_count"))
-        duplicates = duplicate_grain[duplicate_grain["row_count"] > 1]
-    if not duplicates.empty:
         raise ValueError(f"Duplicate source generation grain detected before dimension lookup:\n{duplicates}")
 
     region_lookup = pd.read_sql("""SELECT region_key, UPPER(TRIM(region_name)) AS region_name FROM warehouse.dim_region""",engine)
