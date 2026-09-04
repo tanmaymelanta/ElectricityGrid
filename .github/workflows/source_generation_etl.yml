@@ -51,6 +51,5 @@ jobs:
       - name: Run Source Generation ETL
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          CHANGED_FILES: ${{ steps.changed_files.outputs.files }}
         run: |
           python "Data Pipeline Codes/source_generation_etl.py"
