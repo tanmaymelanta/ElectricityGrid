@@ -7,7 +7,7 @@ from sqlalchemy import create_engine, text
 # ============================================================
 # CONFIGURATION
 # ============================================================
-FOLDER_PATH = "Source Generation"
+FOLDER_PATH = "Source Generation Regionwise"
 DATABASE_URL = os.environ["DATABASE_URL"]
 engine = create_engine(DATABASE_URL)
 
