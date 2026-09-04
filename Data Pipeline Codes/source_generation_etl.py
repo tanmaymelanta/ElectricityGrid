@@ -60,7 +60,7 @@ def source_generation_etl():
         parquet_files = [f.strip() for f in changed_files.splitlines() if f.strip().endswith(".parquet")]
         parquet_files = [f for f in parquet_files if os.path.isfile(f)]
     else:
-        parquet_files = glob.glob(os.path.join(FOLDER_PATH,"*.parquet"))
+        parquet_files = glob.glob(os.path.join(FOLDER_PATH, "*.parquet"))
     print(f"Files to process: {len(parquet_files)}")
     if not parquet_files:
         print("No parquet files require processing.")
