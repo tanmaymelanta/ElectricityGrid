@@ -56,7 +56,6 @@ def source_generation_etl():
     ]
 
     changed_files = os.environ.get("CHANGED_FILES", "").strip()
-    print(os.environ.get("CHANGED_FILES"))
     if changed_files:
         parquet_files = [f.strip() for f in changed_files.splitlines() if f.strip().endswith(".parquet")]
         parquet_files = [f for f in parquet_files if os.path.isfile(f)]
