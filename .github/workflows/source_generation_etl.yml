@@ -42,7 +42,7 @@ jobs:
               --diff-filter=AM \
               "${{ github.event.before }}" \
               "${{ github.sha }}" \
-              -- "Source Generation/**/*.parquet" \
+              -- "Source Generation Regionwise/**/*.parquet" \
               > changed_files.txt
           fi
           echo ""
