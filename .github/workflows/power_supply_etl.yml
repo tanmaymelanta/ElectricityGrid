@@ -1,12 +1,13 @@
 name: Power Supply ETL
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "Power Supply Statewise/**/*.parquet"
-  workflow_dispatch:
+  never
+  # push:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - "Power Supply Statewise/**/*.parquet"
+  # workflow_dispatch:
   
 jobs:
   power-supply-etl:
