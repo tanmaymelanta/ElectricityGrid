@@ -1,12 +1,13 @@
 name: Power Demand Forecast
 
 on:
-  workflow_dispatch:
-  workflow_run:
-    workflows:
-      - "Power Supply ETL"
-    types:
-      - completed
+  never
+  # workflow_dispatch:
+  # workflow_run:
+  #   workflows:
+  #     - "Power Supply ETL"
+  #   types:
+  #     - completed
 
 jobs:
   forecast:
