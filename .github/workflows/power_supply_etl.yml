@@ -1,7 +1,8 @@
 name: Power Supply ETL
 
 on:
-  never
+  schedule:
+    - cron: '30 25 * * *'
   # push:
   #   branches:
   #     - main
