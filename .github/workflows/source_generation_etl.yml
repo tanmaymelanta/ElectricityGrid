@@ -1,7 +1,8 @@
 name: Source Generation ETL
 
 on:
-  never
+    schedule:
+    - cron: '30 25 * * *'
   # push:
   #   branches:
   #     - main
