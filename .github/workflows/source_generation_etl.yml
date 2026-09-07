@@ -1,12 +1,13 @@
 name: Source Generation ETL
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "Source Generation Regionwise/**/*.parquet"
-  workflow_dispatch:
+  never
+  # push:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - "Source Generation Regionwise/**/*.parquet"
+  # workflow_dispatch:
 
 jobs:
   source-generation-etl:
