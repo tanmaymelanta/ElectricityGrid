@@ -1,14 +1,12 @@
 name: Source Generation ETL
 
 on:
-    schedule:
-    - cron: '30 25 * * *'
-  # push:
-  #   branches:
-  #     - main
-  #   paths:
-  #     - "Source Generation Regionwise/**/*.parquet"
-  # workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "Source Generation Regionwise/**/*.parquet"
+  workflow_dispatch:
 
 jobs:
   source-generation-etl:
