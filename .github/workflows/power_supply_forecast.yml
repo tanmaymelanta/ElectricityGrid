@@ -1,14 +1,12 @@
 name: Power Demand Forecast
 
 on:
-    schedule:
-    - cron: '30 25 * * *'
-  # workflow_dispatch:
-  # workflow_run:
-  #   workflows:
-  #     - "Power Supply ETL"
-  #   types:
-  #     - completed
+  workflow_dispatch:
+  workflow_run:
+    workflows:
+      - "Power Supply ETL"
+    types:
+      - completed
 
 jobs:
   forecast:
