@@ -217,7 +217,8 @@ def power_supply_etl():
                 WHERE f.source_filename = s.source_filename
             """
         ))
-        connection.execute(text(f"""
+        connection.execute(text(
+            f"""
             INSERT INTO warehouse.fact_statepowersupply (
                 date_key,
                 region_key,
@@ -242,6 +243,19 @@ def power_supply_etl():
                 od_ud_mu,
                 source_filename
             FROM warehouse.{staging_table}
+            ON CONFLICT (
+                date_key,
+                region_key,
+                COALESCE(state_key, 0),
+                entity_type
+            )
+            DO UPDATE SET
+                energy_met_mu = EXCLUDED.energy_met_mu,
+                max_demand_met_mw = EXCLUDED.max_demand_met_mw,
+                drawal_schedule_mu = EXCLUDED.drawal_schedule_mu,
+                energy_shortage_mu = EXCLUDED.energy_shortage_mu,
+                od_ud_mu = EXCLUDED.od_ud_mu,
+                source_filename = EXCLUDED.source_filename;
             """
         ))
         connection.execute(text(f"DROP TABLE warehouse.{staging_table}"))   
