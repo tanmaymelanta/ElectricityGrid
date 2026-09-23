@@ -152,18 +152,17 @@ def source_generation_etl():
         connection.execute(
             text(
                 f"""
-                INSERT INTO
-                    warehouse.fact_source_generation (
-                        generation_time,
-                        region_key,
-                        nuclear,
-                        wind,
-                        solar,
-                        hydro,
-                        gas,
-                        thermal,
-                        source_filename
-                    )
+                INSERT INTO warehouse.fact_source_generation (
+                    generation_time,
+                    region_key,
+                    nuclear,
+                    wind,
+                    solar,
+                    hydro,
+                    gas,
+                    thermal,
+                    source_filename
+                )
                 SELECT
                     generation_time,
                     region_key,
@@ -174,8 +173,16 @@ def source_generation_etl():
                     gas,
                     thermal,
                     source_filename
-                FROM
-                    warehouse.{staging_table}
+                FROM warehouse.{staging_table}
+                ON CONFLICT (generation_time, region_key)
+                DO UPDATE SET
+                    nuclear = EXCLUDED.nuclear,
+                    wind = EXCLUDED.wind,
+                    solar = EXCLUDED.solar,
+                    hydro = EXCLUDED.hydro,
+                    gas = EXCLUDED.gas,
+                    thermal = EXCLUDED.thermal,
+                    source_filename = EXCLUDED.source_filename;
                 """
             )
         )
