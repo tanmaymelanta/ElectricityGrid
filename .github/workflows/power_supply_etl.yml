@@ -6,48 +6,67 @@ on:
       - main
     paths:
       - "Power Supply Statewise/**/*.parquet"
+
   workflow_dispatch:
-  
+
 jobs:
   power-supply-etl:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
       - name: Detect changed parquet files
         id: changed_files
+        shell: bash
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "Manual run detected."
-            echo "Processing all parquet files."
+            echo "Processing ALL parquet files."
+
             find "Power Supply Statewise" \
               -type f \
               -name "*.parquet" \
               > changed_files.txt
+
           else
             echo "Push detected."
             echo "Finding added/modified parquet files."
+
             git diff \
               --name-only \
               --diff-filter=AM \
               "${{ github.event.before }}" \
               "${{ github.sha }}" \
-              -- "Power Supply Statewise/**/*.parquet" \
-              > changed_files.txt
+              -- "Power Supply Statewise/" \
+              | grep -E '\.parquet$' \
+              > changed_files.txt || true
           fi
+
           echo ""
           echo "Files to process:"
-          cat changed_files.txt
+          cat changed_files.txt || true
+
+          # Export file list for the next step
+          {
+            echo "CHANGED_FILES<<EOF"
+            cat changed_files.txt
+            echo "EOF"
+          } >> "$GITHUB_ENV"
+
       - name: Run Power Supply ETL
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
