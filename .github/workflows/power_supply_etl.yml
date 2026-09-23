@@ -30,7 +30,6 @@ jobs:
           pip install -r requirements.txt
 
       - name: Detect changed parquet files
-        id: changed_files
         shell: bash
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -60,12 +59,9 @@ jobs:
           echo "Files to process:"
           cat changed_files.txt || true
 
-          # Export file list for the next step
-          {
-            echo "CHANGED_FILES<<EOF"
-            cat changed_files.txt
-            echo "EOF"
-          } >> "$GITHUB_ENV"
+          echo ""
+          echo "Total files:"
+          wc -l < changed_files.txt
 
       - name: Run Power Supply ETL
         env:
