@@ -1,0 +1,40 @@
+name: Update Dashboard Data
+
+on:
+  schedule:
+    - cron: "30 2 * * 0"
+    - cron: "30 2 * * 3"
+
+  workflow_dispatch:
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install pandas sqlalchemy psycopg2-binary pyarrow
+
+      - name: Extract data
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          python dashboard_data.py
+
+      - name: Commit updated Parquet files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add streamlit_app/*.parquet
+          git diff --cached --quiet || git commit -m "Update dashboard data"
+          git push
