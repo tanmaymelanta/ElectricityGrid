@@ -98,7 +98,7 @@ DATABASE_URL = os.environ["DATABASE_URL"]
 engine = create_engine(DATABASE_URL)
 
 # ============================== OUTPUT ==============================
-OUTPUT_DIR = "ElectricityGrid/streamlit_app"
+OUTPUT_DIR = "streamlit_app"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # ============================== EXTRACT ==============================
