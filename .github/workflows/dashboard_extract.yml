@@ -28,7 +28,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          python dashboard_data.py
+          python "Data Pipeline Codes/dashboard_data.py"
 
       - name: Commit updated Parquet files
         run: |
