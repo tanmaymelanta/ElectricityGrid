@@ -1,9 +1,7 @@
-# streamlit run "C:\Users\tanmayjayanand.m\PycharmProjects\WelcomeScreen\streamlit app\app.py"
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from db import get_engine
 import json
 
 # ============================== PAGE CONFIG ==============================
@@ -18,47 +16,15 @@ st.title("⚡ India Electric Grid")
 st.caption("Source: GRID-INDIA")
 
 # ============================== LOAD DATA ==============================
-engine = get_engine()
 @st.cache_data(ttl=3600)
 def load_power_supply_data():
-    query = """
-        SELECT
-            report_date,
-            region_name,
-            state_name,
-            entity_type,
-            energy_met_mu,
-            max_demand_met_mw,
-            drawal_schedule_mu,
-            energy_shortage_mu,
-            od_ud_mu,
-            source_filename
-        FROM warehouse.vw_state_power_supply
-        ORDER BY report_date
-    """
-    df = pd.read_sql(query,engine)
+    df = pd.read_parquet("power_supply.parquet")
     df["report_date"] = pd.to_datetime(df["report_date"])
     return df
 
 @st.cache_data(ttl=3600)
 def load_forecast_data():
-    query = """
-        SELECT
-            forecast_date,
-            forecast_level,
-            region_key,
-            region_name,
-            state_key,
-            state_name,
-            predicted_demand_mu,
-            lower_bound_mu,
-            upper_bound_mu,
-            model_name,
-            model_run_date
-        FROM warehouse.vw_power_demand_forecast
-        ORDER BY forecast_date
-    """
-    df = pd.read_sql(query, engine)
+    df = pd.read_parquet("forecast.parquet")
     df["forecast_date"] = pd.to_datetime(df["forecast_date"])
     return df
 
@@ -73,55 +39,31 @@ def load_emission_factors():
 
 @st.cache_data(ttl=3600)
 def load_minute_data():
-    query = """
-        SELECT *
-        FROM warehouse.vw_generation_minute 
-        WHERE generation_time >= NOW() - INTERVAL '3 days';
-    """
-    df = pd.read_sql(query, engine)
+    df = pd.read_parquet("minute.parquet")
     df["generation_time"] = pd.to_datetime(df["generation_time"])
     return df
 
 @st.cache_data(ttl=3600)
 def load_hourly_data():
-    query = """
-        SELECT *
-        FROM warehouse.vw_generation_hourly 
-        WHERE generation_time >= NOW() - INTERVAL '7 days';
-    """
-    df = pd.read_sql(query, engine)
+    df = pd.read_parquet("hourly.parquet")
     df["generation_time"] = pd.to_datetime(df["generation_time"])
     return df
 
 @st.cache_data(ttl=3600)
 def load_daily_data():
-    query = """
-        SELECT *
-        FROM warehouse.vw_generation_daily
-        WHERE generation_time >= NOW() - INTERVAL '90 days';
-    """
-    df = pd.read_sql(query, engine)
+    df = pd.read_parquet("daily.parquet")
     df["generation_time"] = pd.to_datetime(df["generation_time"])
     return df
 
 @st.cache_data(ttl=3600)
 def load_monthly_data():
-    query = """
-        SELECT *
-        FROM warehouse.vw_generation_monthly
-        WHERE generation_time >= NOW() - INTERVAL '12 months';
-    """
-    df = pd.read_sql(query, engine)
+    df = pd.read_parquet("monthly.parquet")
     df["generation_time"] = pd.to_datetime(df["generation_time"])
     return df
 
 @st.cache_data(ttl=3600)
 def load_yearly_data():
-    query = """
-        SELECT *
-        FROM warehouse.vw_generation_yearly;
-    """
-    df = pd.read_sql(query, engine)
+    df = pd.read_parquet("yearly.parquet")
     df["generation_time"] = pd.to_datetime(df["generation_time"])
     return df
 
