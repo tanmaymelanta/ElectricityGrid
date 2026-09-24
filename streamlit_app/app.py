@@ -24,13 +24,13 @@ def load_power_supply_data():
 
 @st.cache_data(ttl=3600)
 def load_forecast_data():
-    df = pd.read_parquet("forecast.parquet")
+    df = pd.read_parquet("streamlit_app/forecast.parquet")
     df["forecast_date"] = pd.to_datetime(df["forecast_date"])
     return df
 
 @st.cache_data
 def load_emission_factors():
-    ef = pd.read_csv(r"C:\Users\tanmayjayanand.m\PycharmProjects\WelcomeScreen\streamlit app\emission_factors.csv")
+    ef = pd.read_csv("streamlit_app/emission_factors.csv")
     ef["source"] = ef["source"].str.strip()
     ef["source_key"] = ef["source"].str.lower()
     ef["lifecycle_ef_gco2eq_kwh"] = pd.to_numeric(ef["lifecycle_ef_gco2eq_kwh"],errors="coerce")
@@ -39,31 +39,31 @@ def load_emission_factors():
 
 @st.cache_data(ttl=3600)
 def load_minute_data():
-    df = pd.read_parquet("minute.parquet")
+    df = pd.read_parquet("streamlit_app/minute.parquet")
     df["generation_time"] = pd.to_datetime(df["generation_time"])
     return df
 
 @st.cache_data(ttl=3600)
 def load_hourly_data():
-    df = pd.read_parquet("hourly.parquet")
+    df = pd.read_parquet("streamlit_app/hourly.parquet")
     df["generation_time"] = pd.to_datetime(df["generation_time"])
     return df
 
 @st.cache_data(ttl=3600)
 def load_daily_data():
-    df = pd.read_parquet("daily.parquet")
+    df = pd.read_parquet("streamlit_app/daily.parquet")
     df["generation_time"] = pd.to_datetime(df["generation_time"])
     return df
 
 @st.cache_data(ttl=3600)
 def load_monthly_data():
-    df = pd.read_parquet("monthly.parquet")
+    df = pd.read_parquet("streamlit_app/monthly.parquet")
     df["generation_time"] = pd.to_datetime(df["generation_time"])
     return df
 
 @st.cache_data(ttl=3600)
 def load_yearly_data():
-    df = pd.read_parquet("yearly.parquet")
+    df = pd.read_parquet("streamlit_app/yearly.parquet")
     df["generation_time"] = pd.to_datetime(df["generation_time"])
     return df
 
