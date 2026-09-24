@@ -1,0 +1,7 @@
+source,lifecycle_ef_gco2eq_kwh,operational_ef_gco2eq_kwh
+Solar,45,0
+Wind,11,0
+Hydro,24,0
+Nuclear,12,0
+Gas,490,370
+Thermal,820,760
