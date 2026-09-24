@@ -18,7 +18,7 @@ st.caption("Source: GRID-INDIA")
 # ============================== LOAD DATA ==============================
 @st.cache_data(ttl=3600)
 def load_power_supply_data():
-    df = pd.read_parquet("power_supply.parquet")
+    df = pd.read_parquet("streamlit_app/power_supply.parquet")
     df["report_date"] = pd.to_datetime(df["report_date"])
     return df
 
