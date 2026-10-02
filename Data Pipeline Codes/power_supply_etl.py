@@ -156,6 +156,7 @@ def power_supply_etl():
     }
     for source_column in numeric_mapping:
         grouped_df[source_column] = pd.to_numeric(grouped_df[source_column], errors="coerce")
+    grouped_df = grouped_df[grouped_df["State"].notna() & grouped_df["State"].str.strip().ne("")]
     # ============================== LOAD DIMENSION LOOKUPS ==============================
     date_lookup = pd.read_sql("SELECT date_key, full_date FROM warehouse.dim_date", engine)
     date_lookup["full_date"] = pd.to_datetime(date_lookup["full_date"]).dt.date
