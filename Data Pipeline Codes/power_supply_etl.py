@@ -138,7 +138,7 @@ def power_supply_etl():
     grouped_df = final_df.groupby(["report_date", "Region", "State"], as_index=False).agg(agg_dict)
     grouped_df["entity_type"] = grouped_df["State"].apply(get_entity_type)
     # ============================== DATE CLEANUP ==============================
-    grouped_df["report_date"] = pd.to_datetime(grouped_df["report_date"],format="%d-%m-%y",errors="coerce").dt.date
+    grouped_df["report_date"] = pd.to_datetime(grouped_df["report_date"],format="%Y-%m-%d",errors="coerce").dt.date
     if grouped_df["report_date"].isna().any():
         bad_dates = grouped_df[grouped_df["report_date"].isna()]
         raise ValueError("Invalid report_date values found:\n"f"{bad_dates.head(20)}")
