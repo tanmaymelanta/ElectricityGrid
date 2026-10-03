@@ -156,7 +156,14 @@ def power_supply_etl():
     }
     for source_column in numeric_mapping:
         grouped_df[source_column] = pd.to_numeric(grouped_df[source_column], errors="coerce")
-    # grouped_df = grouped_df[grouped_df["State"].notna() & grouped_df["State"].str.strip().ne("")]
+
+    grouped_df = grouped_df[grouped_df["State"].notna() & grouped_df["State"].str.strip().ne("")]
+
+    required_states = ["Telangana", "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chandigarh", "Chhattisgarh", "Diu, Daman & Dadra Nagar Haveli", "Delhi", "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Puducherry", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal", "J&K(UT) & Ladakh(UT)"]
+    present_states = set(grouped_df["State"].str.strip())
+    missing_states = [state for state in required_states if state not in present_states]
+    if missing_states:
+        raise ValueError(f"Some states are missing from the extract:\n{missing_states}")
     # ============================== LOAD DIMENSION LOOKUPS ==============================
     date_lookup = pd.read_sql("SELECT date_key, full_date FROM warehouse.dim_date", engine)
     date_lookup["full_date"] = pd.to_datetime(date_lookup["full_date"]).dt.date
