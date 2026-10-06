@@ -218,7 +218,7 @@ def main():
     pdf_path = TEMP_DIR / f"{filename}.pdf"
     pdf_path.write_bytes(pdf_bytes)
 
-    processed_files = github_request_files(FOLDER="Source Generation Regionwise")
+    processed_files = github_request_files(folder="Source Generation Regionwise")
     if report_date not in processed_files:
         try:
             df_pct, final_df = generation_source_table_extract(pdf_path=pdf_path,report_date=report_date)
@@ -227,7 +227,7 @@ def main():
         except Exception as e:
             print(e)
 
-    processed_files = github_request_files(FOLDER="Power Supply Statewise")
+    processed_files = github_request_files(folder="Power Supply Statewise")
     if report_date not in processed_files:
         try:
             statewise = statewise_table_extract(pdf_path=pdf_path,filename=filename,report_date=report_date)
