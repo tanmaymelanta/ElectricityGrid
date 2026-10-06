@@ -30,7 +30,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run Source Generation ETL
+      - name: Run PSP Extract
         env:
           GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
           PSP_API_KEY: ${{ secrets.PSP_API_KEY }}
