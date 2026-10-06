@@ -325,11 +325,19 @@ with tab2:
         st.warning(f"No generation data is available for the selected {resolution.lower()} resolution.")
         st.stop()
 
+    date_formats = {
+        "15 Min": "%Y-%m-%d %H:%M",
+        "Hourly": "%Y-%m-%d %H:%M",
+        "Daily": "%Y-%m-%d",
+        "Monthly": "%B %Y",
+        "Yearly": "%Y"
+    }
+
     selected_period = st.select_slider(
         "Select Time Period",
         options=available_periods,
         value=available_periods[-1],
-        format_func=lambda x: x.strftime("%Y-%m-%d %H:%M")
+        format_func=lambda x: x.strftime(date_formats[resolution])
     )
     selected_df = df[df["generation_time"] == selected_period].copy()
 
