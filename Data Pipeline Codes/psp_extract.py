@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 API_URL = "https://z7kbg6njuc.execute-api.ap-south-1.amazonaws.com/psp"
 API_KEY = os.environ["PSP_API_KEY"]
-GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
+GITHUB_TOKEN = os.environ["GIT_TOKEN"]
 
 OWNER = "tanmaymelanta"
 REPO = "ElectricityGrid"
