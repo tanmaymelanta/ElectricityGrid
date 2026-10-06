@@ -3,3 +3,4 @@ pyarrow
 sqlalchemy
 psycopg[binary]
 prophet
+requests
