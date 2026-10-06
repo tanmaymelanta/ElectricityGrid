@@ -126,7 +126,7 @@ def create_state_forecasts(df):
 def load_forecast(df):
     with engine.begin() as connection:
         connection.execute(text(""" DELETE FROM warehouse.fact_power_demand_forecast"""))    
-    df.to_sql("fact_power_demand_forecast",engine,schema="warehouse",if_exists="append",index=False,method="multi")
+    df.to_sql("fact_power_demand_forecast",engine,schema="warehouse",if_exists="append",index=False,method="multi",chunksize=5000)
 
 # ============================================================
 # MAIN
