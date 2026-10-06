@@ -4,4 +4,4 @@ sqlalchemy
 psycopg[binary]
 prophet
 requests
-camelot
+camelot-py[cv]
