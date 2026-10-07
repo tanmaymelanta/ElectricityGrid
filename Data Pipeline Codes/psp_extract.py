@@ -223,7 +223,7 @@ def main():
         try:
             df_pct, final_df = generation_source_table_extract(pdf_path=pdf_path,report_date=report_date)
             source_region_df = source_region_extract(df_pct=df_pct,final_df=final_df,filename=filename)
-            github_upload_parquet(df=source_region_df,folder="Source Generation Regionwise",report_date=result["report_date"])
+            github_upload_parquet(df=source_region_df,folder="Source Generation Regionwise",report_date=report_date)
         except Exception as e:
             print(e)
 
@@ -231,7 +231,7 @@ def main():
     if report_date not in processed_files:
         try:
             statewise = statewise_table_extract(pdf_path=pdf_path,filename=filename,report_date=report_date)
-            github_upload_parquet(df=statewise,folder="Power Supply Statewise",report_date=result["report_date"])
+            github_upload_parquet(df=statewise,folder="Power Supply Statewise",report_date=report_date)
         except Exception as e:
             print(e)
     
