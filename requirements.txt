@@ -5,3 +5,5 @@ psycopg[binary]
 prophet
 requests
 camelot-py[cv]
+streamlit
+plotly
