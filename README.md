@@ -172,8 +172,7 @@ ElectricityGrid/
 │   ├── daily.parquet
 │   ├── monthly.parquet
 │   ├── yearly.parquet
-│   ├── emission_factors.csv
-│   └── requirements.txt
+│   └── emission_factors.csv
 │
 ├── requirements.txt
 └── README.md
