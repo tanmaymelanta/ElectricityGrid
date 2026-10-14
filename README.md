@@ -5,38 +5,6 @@ An end-to-end data engineering and analytics platform for India's electricity gr
 ## 🏗️ Architecture
 <img width="1536" height="1024" alt="ElectricityGrid_Architecture_v2" src="https://github.com/user-attachments/assets/14fb98c6-7f1a-47d9-8bed-2c994e79435d" />
 
-```mermaid
-flowchart TD
-    A["🗓️ GitHub Actions<p style="font-size: 0.75rem;">Daily trigger · Requests yesterday's report</p>"]
-    B["🌐 Amazon API Gateway"]
-    C["☁️ AWS Lambda (ap-south-1)<p style="font-size: 0.75rem;">Accesses Grid-India API and downloads the PDF</p>"]
-    D["⚡ GRID-INDIA API and PDF CDN<p style="font-size: 0.75rem;">Indian IP required</p>"]
-    E["🔄 Extract and Process Report"]
-    F["🔌 Power Supply<p style="font-size: 0.75rem;">State-wise Parquet</p>"]
-    G["🏭 Source Generation<p style="font-size: 0.75rem;">Region-wise Parquet</p>"]
-    H["📈 Prophet Forecasting<p style="font-size: 0.75rem;">Forecasts Power Demand</p>"]
-    I["🗄️ Supabase PostgreSQL<p style="font-size: 0.75rem;">ETL workflows · Dimensional model · Three analytical views</p>"]
-    J["🗂️ Daily database snapshot stored in GitHub"]
-    K["📊 Streamlit Dashboard<p style="font-size: 0.75rem;">Reads prepared data without repeatedly querying Supabase</p>"]
-
-    A --> B
-    B --> C
-    C <--> D
-    C --> B
-    B --> A
-    A --> E
-
-    E --> F
-    E --> G
-
-    F --> H
-    G --> I
-    H --> I
-
-    I --> J
-    J --> K
-```
-
 ## 📌 Project Overview
 
 The project consists of five automated workflows that handle report extraction, ETL, forecasting, and dashboard data delivery.
