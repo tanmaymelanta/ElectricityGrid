@@ -3,6 +3,7 @@
 An end-to-end data engineering and analytics platform for India's electricity grid. This project automates daily data extraction from Grid-India, processes power supply and regional source generation data, maintains historical Parquet datasets in GitHub, loads analytical data into Supabase PostgreSQL, generates forecasts using Prophet, and powers an interactive Streamlit dashboard.
 
 ## 🏗️ Architecture
+<img width="1536" height="1024" alt="ElectricityGrid_Architecture_v2" src="https://github.com/user-attachments/assets/14fb98c6-7f1a-47d9-8bed-2c994e79435d" />
 
 ```mermaid
 flowchart TD
